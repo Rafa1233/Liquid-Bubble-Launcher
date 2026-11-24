@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -69,9 +68,11 @@ import com.liquidbubble.launcher.system.LiquidNotificationListenerService
 import com.liquidbubble.launcher.system.WeatherRepository
 import com.liquidbubble.launcher.ui.theme.LiquidBubbleTheme
 import com.liquidbubble.launcher.wallpaper.WallpaperEngine
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun LauncherScreen(viewModel: LauncherViewModel) {
@@ -122,11 +123,11 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { settings.pageCount.coerceAtLeast(3) })
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, settings.hostedWidgets.isNotEmpty()) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> appWidgetHostManager.startListening()
-                Lifecycle.Event.ON_STOP -> appWidgetHostManager.stopListening()
+                Lifecycle.Event.ON_START -> if (settings.hostedWidgets.isNotEmpty()) appWidgetHostManager.startListening()
+                Lifecycle.Event.ON_STOP -> if (settings.hostedWidgets.isNotEmpty()) appWidgetHostManager.stopListening()
                 Lifecycle.Event.ON_RESUME -> isResumed = true
                 Lifecycle.Event.ON_PAUSE -> isResumed = false
                 else -> Unit
@@ -139,6 +140,14 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
         }
     }
 
+    LaunchedEffect(installedApps, settings.activeIconPackPackage) {
+        withContext(Dispatchers.IO) {
+            installedApps.take(28).forEach { app ->
+                viewModel.appManager.getAppIconImageBitmap(app, settings.activeIconPackPackage, 144)
+            }
+        }
+    }
+
     LaunchedEffect(batteryMonitor) { batteryMonitor.observeBattery().collect { viewModel.publishBatteryState(it) } }
     LaunchedEffect(flashlightManager) {
         viewModel.publishQuickControls { it.copy(isTorchAvailable = flashlightManager.isAvailable()) }
@@ -148,15 +157,20 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
 
     LaunchedEffect(isResumed) {
         if (!isResumed) return@LaunchedEffect
+        delay(350L)
         while (isActive) {
-            viewModel.publishSystemMetrics(deviceMonitor.readSystemMetrics())
-            val wifi = deviceMonitor.isWifiConnected()
-            val bt = deviceMonitor.isBluetoothEnabled()
+            val (metrics, wifi, bt, mediaResult) = withContext(Dispatchers.IO) {
+                val m = deviceMonitor.readSystemMetrics()
+                val w = deviceMonitor.isWifiConnected()
+                val b = deviceMonitor.isBluetoothEnabled()
+                val mr = runCatching { mediaController.refreshPlaybackState() }.getOrElse { media to null }
+                Quad(m, w, b, mr)
+            }
+            viewModel.publishSystemMetrics(metrics)
             viewModel.publishQuickControls { it.copy(isWifiConnected = wifi, isBluetoothOn = bt) }
-            val (mediaInfo, art) = mediaController.refreshPlaybackState()
-            viewModel.publishMediaState(mediaInfo)
-            albumArt = art
-            delay(if (isIslandExpanded) 1_500L else 6_000L)
+            viewModel.publishMediaState(mediaResult.first)
+            albumArt = mediaResult.second
+            delay(if (isIslandExpanded) 2_000L else 8_000L)
         }
     }
 
@@ -170,7 +184,7 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
                 .onSuccess { viewModel.publishWeatherState(it) }
                 .onFailure {
                     if (weather.temperatureCelsius == null) {
-                        viewModel.publishWeatherState(weather.copy(locationName = label, errorMessage = "Offline · Tap to retry"))
+                        viewModel.publishWeatherState(weather.copy(locationName = label, errorMessage = "Offline · Ketuk ulang"))
                     }
                 }
         }
@@ -189,12 +203,12 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
 
     val defaultLauncherPrompt = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { viewModel.refreshDefaultLauncherStatus() }
     val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) flashlightManager.setTorchEnabled(!quickControls.isTorchOn).onFailure { viewModel.showMessage("Flashlight unavailable") }
-        else viewModel.showMessage("Camera permission denied")
+        if (granted) flashlightManager.setTorchEnabled(!quickControls.isTorchOn).onFailure { viewModel.showMessage("Senter tidak tersedia") }
+        else viewModel.showMessage("Izin kamera ditolak")
     }
     val locationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) { viewModel.updateSettings { it.copy(useDeviceLocationForWeather = true) }; triggerWeatherRefresh() }
-        else viewModel.showMessage("Using manual city weather")
+        else viewModel.showMessage("Menggunakan kota manual")
     }
     val wallpaperPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri != null) {
@@ -215,14 +229,14 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
         val targetPage = pagerState.currentPage.coerceAtLeast(2)
         if (result.resultCode == Activity.RESULT_OK && provider != null && widgetId != -1) {
             viewModel.addHostedWidget(AndroidWidgetPlacement(widgetId, provider.provider.packageName, provider.provider.className, targetPage, label = provider.loadLabel(context.packageManager)))
-            viewModel.showMessage("Widget added to page ${targetPage + 1}")
+            viewModel.showMessage("Widget ditambahkan ke halaman ${targetPage + 1}")
         } else if (widgetId != -1) appWidgetHostManager.deleteWidgetId(widgetId)
     }
 
     fun handleToggleTorch() {
-        if (!flashlightManager.isAvailable()) { viewModel.showMessage("Hardware flashlight not available"); return }
+        if (!flashlightManager.isAvailable()) { viewModel.showMessage("Senter tidak tersedia"); return }
         if (!flashlightManager.hasCameraPermission()) { showCameraRationaleDialog = true; return }
-        flashlightManager.setTorchEnabled(!quickControls.isTorchOn).onFailure { viewModel.showMessage("Unable to toggle flashlight") }
+        flashlightManager.setTorchEnabled(!quickControls.isTorchOn).onFailure { viewModel.showMessage("Gagal menyalakan senter") }
     }
 
     fun handleSelectAndroidWidget(provider: AppWidgetProviderInfo) {
@@ -231,7 +245,7 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
         val targetPage = pagerState.currentPage.coerceAtLeast(2)
         if (appWidgetHostManager.tryBindWidget(widgetId, provider)) {
             viewModel.addHostedWidget(AndroidWidgetPlacement(widgetId, provider.provider.packageName, provider.provider.className, targetPage, label = provider.loadLabel(context.packageManager)))
-            viewModel.showMessage("Widget added to page ${targetPage + 1}")
+            viewModel.showMessage("Widget ditambahkan ke halaman ${targetPage + 1}")
         } else {
             pendingWidgetBindId = widgetId; pendingWidgetProvider = provider
             appWidgetBindLauncher.launch(appWidgetHostManager.createBindRequestIntent(widgetId, provider))
@@ -254,7 +268,12 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
                     onToggleExpanded = { viewModel.setIslandExpanded(it) },
                     onTogglePlayPause = {
                         mediaController.togglePlayPause()
-                        scope.launch { delay(250); val (updated, art) = mediaController.refreshPlaybackState(); viewModel.publishMediaState(updated); albumArt = art }
+                        scope.launch {
+                            delay(250)
+                            val (updated, art) = withContext(Dispatchers.IO) { mediaController.refreshPlaybackState() }
+                            viewModel.publishMediaState(updated)
+                            albumArt = art
+                        }
                     },
                     onSkipNext = { mediaController.skipToNext() },
                     onSkipPrevious = { mediaController.skipToPrevious() },
@@ -272,7 +291,7 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
                     onOpenDrawer = { autoFocus -> viewModel.setAppDrawerVisible(true, autoFocus) },
                     onOpenFolder = { viewModel.openFolder(it) },
                     onDeleteFolder = { viewModel.deleteFolder(it) },
-                    onCreateFolderWithApp = { app -> viewModel.createFolder(app.category.displayName, listOf(app.componentKey)); viewModel.showMessage("Created folder") },
+                    onCreateFolderWithApp = { app -> viewModel.createFolder(app.category.displayName, listOf(app.componentKey)); viewModel.showMessage("Folder dibuat") },
                     onAddAppToFolder = { fid, key -> viewModel.addAppToFolder(fid, key) },
                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                     onAddToDock = { viewModel.addToDock(it) },
@@ -360,17 +379,17 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
         if (showCameraRationaleDialog) {
             AlertDialog(
                 onDismissRequest = { showCameraRationaleDialog = false },
-                title = { Text("Enable Flashlight Access") },
-                text = { Text("Camera permission is needed solely to control the device hardware torch.") },
-                confirmButton = { TextButton(onClick = { showCameraRationaleDialog = false; cameraPermissionLauncher.launch(Manifest.permission.CAMERA) }) { Text("Allow") } },
-                dismissButton = { TextButton(onClick = { showCameraRationaleDialog = false }) { Text("Cancel") } }
+                title = { Text("Izinkan Akses Senter") },
+                text = { Text("Izin kamera hanya diperlukan untuk menyalakan lampu flash dari Dynamic Island.") },
+                confirmButton = { TextButton(onClick = { showCameraRationaleDialog = false; cameraPermissionLauncher.launch(Manifest.permission.CAMERA) }) { Text("Izinkan") } },
+                dismissButton = { TextButton(onClick = { showCameraRationaleDialog = false }) { Text("Batal") } }
             )
         }
         if (showWidgetPicker) {
             val providers = remember { appWidgetHostManager.getInstalledProviders() }
             AlertDialog(
                 onDismissRequest = { showWidgetPicker = false },
-                title = { Text("Add Android Widget") },
+                title = { Text("Tambah Widget Android") },
                 text = {
                     LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
                         items(providers) { info ->
@@ -382,14 +401,14 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { showWidgetPicker = false }) { Text("Close") } }
+                confirmButton = { TextButton(onClick = { showWidgetPicker = false }) { Text("Tutup") } }
             )
         }
         val slotIdx = dockReplaceSlotIndex
         if (slotIdx != null) {
             AlertDialog(
                 onDismissRequest = { dockReplaceSlotIndex = null },
-                title = { Text("Choose Dock App") },
+                title = { Text("Pilih Aplikasi Dock") },
                 text = {
                     LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
                         items(installedApps, key = { it.componentKey }) { app ->
@@ -397,7 +416,7 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { dockReplaceSlotIndex = null }) { Text("Cancel") } }
+                confirmButton = { TextButton(onClick = { dockReplaceSlotIndex = null }) { Text("Batal") } }
             )
         }
         if (showWeatherDialog) {
@@ -418,33 +437,32 @@ fun LauncherScreen(viewModel: LauncherViewModel) {
     }
 }
 
+private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
 @Composable
 private fun WeatherLocationDialog(
-    currentCity: String,
-    weatherRepository: WeatherRepository,
-    onUseDeviceLocation: () -> Unit,
-    onSelectCity: (GeocodedLocation) -> Unit,
-    onDismiss: () -> Unit
+    currentCity: String, weatherRepository: WeatherRepository,
+    onUseDeviceLocation: () -> Unit, onSelectCity: (GeocodedLocation) -> Unit, onDismiss: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf(currentCity) }
     var results by remember { mutableStateOf<List<GeocodedLocation>>(emptyList()) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Weather Location") },
+        title = { Text("Lokasi Cuaca") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onUseDeviceLocation) { Text("Use Approximate Device Location (Optional)") }
-                OutlinedTextField(value = query, onValueChange = { query = it; scope.launch { results = weatherRepository.searchCity(it) } }, label = { Text("Search City") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                TextButton(onClick = onUseDeviceLocation) { Text("Gunakan Lokasi Perangkat (Opsional)") }
+                OutlinedTextField(value = query, onValueChange = { query = it; scope.launch { results = weatherRepository.searchCity(it) } }, label = { Text("Cari Kota") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
                     items(results) { item ->
                         Row(modifier = Modifier.fillMaxWidth().clickable { onSelectCity(item) }.padding(vertical = 8.dp)) { Text("${item.name}, ${item.country}", fontSize = 13.sp) }
                     }
                 }
                 Spacer(modifier = Modifier.height(2.dp))
-                Text("Powered by Open-Meteo (no API key required)", fontSize = 11.sp)
+                Text("Powered by Open-Meteo", fontSize = 11.sp)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Tutup") } }
     )
 }

@@ -19,6 +19,8 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.util.LruCache
 import android.view.View
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import com.liquidbubble.launcher.data.model.AppCategory
 import com.liquidbubble.launcher.data.model.AppInfo
 import com.liquidbubble.launcher.data.model.IconPackInfo
@@ -32,7 +34,8 @@ import org.xmlpull.v1.XmlPullParser
 class AppManager(private val context: Context) {
 
     private val packageManager: PackageManager = context.packageManager
-    private val iconCache = object : LruCache<String, Bitmap>(160) {}
+    private val iconCache = object : LruCache<String, Bitmap>(180) {}
+    private val imageBitmapCache = object : LruCache<String, ImageBitmap>(180) {}
 
     private var loadedIconPackPackage: String? = null
     private var iconPackComponentMap: Map<String, String> = emptyMap()
@@ -41,7 +44,7 @@ class AppManager(private val context: Context) {
     fun observePackageChanges(): Flow<Unit> = callbackFlow {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context?, intent: Intent?) {
-                iconCache.evictAll()
+                clearIconCache()
                 trySend(Unit)
             }
         }
@@ -61,9 +64,7 @@ class AppManager(private val context: Context) {
     }
 
     suspend fun loadInstalledApps(): List<AppInfo> = withContext(Dispatchers.IO) {
-        val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
-            addCategory(Intent.CATEGORY_LAUNCHER)
-        }
+        val mainIntent = Intent(Intent.ACTION_MAIN, null).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
         val resolveInfos = queryActivitiesCompat(mainIntent)
         val ownPackage = context.packageName
 
@@ -78,18 +79,15 @@ class AppManager(private val context: Context) {
                 val label = runCatching { info.loadLabel(packageManager).toString().trim() }.getOrDefault(pkg)
                 val pkgInfo = runCatching { getPackageInfoCompat(pkg) }.getOrNull()
                 val appInfo = activityInfo.applicationInfo
-                val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                val category = mapAndroidCategory(appInfo, pkg, label)
-
                 AppInfo(
                     label = label.ifEmpty { pkg },
                     packageName = pkg,
                     activityName = cls,
                     componentKey = key,
-                    category = category,
+                    category = mapAndroidCategory(appInfo, pkg, label),
                     firstInstallTime = pkgInfo?.firstInstallTime ?: 0L,
                     lastUpdateTime = pkgInfo?.lastUpdateTime ?: 0L,
-                    isSystemApp = isSystem
+                    isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                 )
             }
             .distinctBy { it.componentKey }
@@ -106,12 +104,9 @@ class AppManager(private val context: Context) {
         )
         val resolved = mutableListOf<String>()
         for (candidate in intentCandidates) {
-            val match = resolveActivityCompat(candidate)
-            val pkg = match?.activityInfo?.packageName
-            val matchingInstalled = if (pkg != null) installedApps.firstOrNull { it.packageName == pkg } else null
-            if (matchingInstalled != null && matchingInstalled.componentKey !in resolved) {
-                resolved.add(matchingInstalled.componentKey)
-            }
+            val pkg = resolveActivityCompat(candidate)?.activityInfo?.packageName
+            val match = if (pkg != null) installedApps.firstOrNull { it.packageName == pkg } else null
+            if (match != null && match.componentKey !in resolved) resolved.add(match.componentKey)
         }
         if (resolved.size < 4) {
             for (app in installedApps) {
@@ -122,7 +117,18 @@ class AppManager(private val context: Context) {
         return resolved
     }
 
-    suspend fun getAppIconBitmap(app: AppInfo, iconPackPackage: String?, sizePx: Int = 168): Bitmap? = withContext(Dispatchers.IO) {
+    fun getCachedIconImage(app: AppInfo, iconPackPackage: String?): ImageBitmap? {
+        return imageBitmapCache.get("${app.componentKey}|${iconPackPackage.orEmpty()}")
+    }
+
+    suspend fun getAppIconImageBitmap(app: AppInfo, iconPackPackage: String?, sizePx: Int = 144): ImageBitmap? {
+        val cacheKey = "${app.componentKey}|${iconPackPackage.orEmpty()}"
+        imageBitmapCache.get(cacheKey)?.let { return it }
+        val bmp = getAppIconBitmap(app, iconPackPackage, sizePx) ?: return null
+        return bmp.asImageBitmap().also { imageBitmapCache.put(cacheKey, it) }
+    }
+
+    suspend fun getAppIconBitmap(app: AppInfo, iconPackPackage: String?, sizePx: Int = 144): Bitmap? = withContext(Dispatchers.IO) {
         val cacheKey = "${app.componentKey}|${iconPackPackage.orEmpty()}"
         iconCache.get(cacheKey)?.let { return@withContext it }
 
@@ -135,18 +141,23 @@ class AppManager(private val context: Context) {
         }.getOrNull()
 
         val bitmap = drawable?.let { drawableToBitmap(it, sizePx) }
-        if (bitmap != null) iconCache.put(cacheKey, bitmap)
+        if (bitmap != null) {
+            iconCache.put(cacheKey, bitmap)
+            imageBitmapCache.put(cacheKey, bitmap.asImageBitmap())
+        }
         bitmap
     }
 
-    fun clearIconCache() { iconCache.evictAll() }
+    fun clearIconCache() {
+        iconCache.evictAll()
+        imageBitmapCache.evictAll()
+    }
 
     suspend fun discoverIconPacks(): List<IconPackInfo> = withContext(Dispatchers.IO) {
         val themes = listOf("org.adw.launcher.THEMES", "com.novalauncher.THEME", "com.teslacoilsw.launcher.THEME")
         val found = linkedMapOf<String, IconPackInfo>()
         for (action in themes) {
-            val infos = queryActivitiesCompat(Intent(action))
-            for (ri in infos) {
+            for (ri in queryActivitiesCompat(Intent(action))) {
                 val pkg = ri.activityInfo?.packageName ?: continue
                 if (!found.containsKey(pkg)) found[pkg] = IconPackInfo(pkg, ri.loadLabel(packageManager).toString())
             }
@@ -155,16 +166,15 @@ class AppManager(private val context: Context) {
     }
 
     fun launchApp(app: AppInfo, sourceView: View? = null): Result<Unit> = runCatching {
-        val component = ComponentName(app.packageName, app.activityName)
         val launchIntent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
-            this.component = component
+            component = ComponentName(app.packageName, app.activityName)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
         }
         val options = sourceView?.let { ActivityOptions.makeScaleUpAnimation(it, 0, 0, it.width, it.height).toBundle() }
         context.startActivity(launchIntent, options)
     }.recoverCatching {
-        val fallback = packageManager.getLaunchIntentForPackage(app.packageName) ?: error("Launch intent unavailable for ${app.packageName}")
+        val fallback = packageManager.getLaunchIntentForPackage(app.packageName) ?: error("Launch intent unavailable")
         fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(fallback)
     }
@@ -204,9 +214,9 @@ class AppManager(private val context: Context) {
                 var event = parser.eventType
                 while (event != XmlPullParser.END_DOCUMENT) {
                     if (event == XmlPullParser.START_TAG && parser.name == "item") {
-                        val component = parser.getAttributeValue(null, "component")
-                        val drawable = parser.getAttributeValue(null, "drawable")
-                        if (!component.isNullOrBlank() && !drawable.isNullOrBlank()) map[component] = drawable
+                        val c = parser.getAttributeValue(null, "component")
+                        val d = parser.getAttributeValue(null, "drawable")
+                        if (!c.isNullOrBlank() && !d.isNullOrBlank()) map[c] = d
                     }
                     event = parser.next()
                 }
@@ -216,7 +226,7 @@ class AppManager(private val context: Context) {
     }
 
     private fun drawableToBitmap(drawable: Drawable, sizePx: Int): Bitmap {
-        val targetSize = sizePx.coerceIn(64, 256)
+        val targetSize = sizePx.coerceIn(64, 192)
         val bitmap = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         drawable.setBounds(0, 0, targetSize, targetSize)
@@ -246,23 +256,14 @@ class AppManager(private val context: Context) {
     }
 
     private fun queryActivitiesCompat(intent: Intent): List<ResolveInfo> =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong()))
-        } else {
-            @Suppress("DEPRECATION") packageManager.queryIntentActivities(intent, 0)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong()))
+        else @Suppress("DEPRECATION") packageManager.queryIntentActivities(intent, 0)
 
     private fun resolveActivityCompat(intent: Intent): ResolveInfo? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            packageManager.resolveActivity(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
-        } else {
-            @Suppress("DEPRECATION") packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) packageManager.resolveActivity(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+        else @Suppress("DEPRECATION") packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
 
     private fun getPackageInfoCompat(pkg: String) =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            packageManager.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(0))
-        } else {
-            @Suppress("DEPRECATION") packageManager.getPackageInfo(pkg, 0)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) packageManager.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(0))
+        else @Suppress("DEPRECATION") packageManager.getPackageInfo(pkg, 0)
 }

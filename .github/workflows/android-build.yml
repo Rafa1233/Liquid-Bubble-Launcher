@@ -1,4 +1,4 @@
-name: Build Liquid Bubble Launcher APK
+name: Build Rii Launcher APK
 
 on:
   push:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Validate, Test & Build Debug APK
+    name: Validate, Test & Build 120FPS APK
     runs-on: ubuntu-latest
 
     steps:
@@ -53,41 +53,33 @@ jobs:
           chmod +x ./gradlew
           ./gradlew --version
 
-      - name: 6. Resolve & Verify Dependencies
-        run: ./gradlew :app:dependencies --configuration debugRuntimeClasspath --no-daemon
-
-      - name: 7. Run Unit Tests
+      - name: 6. Run Unit Tests
         run: ./gradlew testDebugUnitTest --no-daemon
 
-      - name: 8. Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon
+      - name: 7. Build Debug & R8-Optimized 120FPS Release APKs
+        run: ./gradlew assembleDebug assembleRelease --no-daemon
 
-      - name: 9. Verify Debug APK Output Exists
+      - name: 8. Verify APK Outputs
         run: |
           test -f app/build/outputs/apk/debug/app-debug.apk
-          ls -lh app/build/outputs/apk/debug/app-debug.apk
+          test -f app/build/outputs/apk/release/app-release.apk
+          cp app/build/outputs/apk/release/app-release.apk RiiLauncher-120fps.apk
+          ls -lh RiiLauncher-120fps.apk app/build/outputs/apk/debug/app-debug.apk
 
-      - name: 10. Upload Unit Test Reports
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: unit-test-report
-          path: app/build/reports/tests/testDebugUnitTest/
-          if-no-files-found: ignore
-
-      - name: 11. Upload Downloadable Debug APK Artifact
+      - name: 9. Upload R8-Optimized Rii Launcher APK
         if: success()
         uses: actions/upload-artifact@v7
         with:
-          name: LiquidBubbleLauncher-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: RiiLauncher-120fps-apk
+          path: RiiLauncher-120fps.apk
           retention-days: 30
 
-      - name: 12. Publish GitHub Release (on Tag Push v*)
+      - name: 10. Publish GitHub Release (on Tag Push v*)
         if: success() && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with:
-          name: "Liquid Bubble Launcher ${{ github.ref_name }}"
+          name: "Rii Launcher ${{ github.ref_name }}"
           generate_release_notes: true
           files: |
+            RiiLauncher-120fps.apk
             app/build/outputs/apk/debug/app-debug.apk

@@ -1,6 +1,5 @@
 package com.liquidbubble.launcher.components
 
-import android.graphics.Bitmap
 import android.net.Uri
 import android.view.HapticFeedbackConstants
 import android.view.View
@@ -34,12 +33,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -88,11 +87,15 @@ fun LiquidAppIcon(
     val squircleShape = remember(settings.iconCornerRadiusDp) { RoundedCornerShape(settings.iconCornerRadiusDp.dp) }
 
     val customUri = settings.customAppIconUris[app.componentKey]
-    val iconPx = with(density) { finalIconSize.roundToPx().coerceIn(72, 240) }
-    var loadedBitmap by remember(app.componentKey, settings.activeIconPackPackage, iconPx) { mutableStateOf<Bitmap?>(null) }
+    val iconPx = with(density) { finalIconSize.roundToPx().coerceIn(72, 192) }
+    var loadedImage by remember(app.componentKey, settings.activeIconPackPackage) {
+        mutableStateOf<ImageBitmap?>(appManager.getCachedIconImage(app, settings.activeIconPackPackage))
+    }
 
     LaunchedEffect(app.componentKey, settings.activeIconPackPackage, customUri, iconPx) {
-        if (customUri == null) loadedBitmap = appManager.getAppIconBitmap(app, settings.activeIconPackPackage, iconPx)
+        if (customUri == null && loadedImage == null) {
+            loadedImage = appManager.getAppIconImageBitmap(app, settings.activeIconPackPackage, iconPx)
+        }
     }
 
     val interactionSource = remember { MutableInteractionSource() }
@@ -107,6 +110,13 @@ fun LiquidAppIcon(
     val animatedScale by animateFloatAsState(targetScale * externalScale, LiquidSprings.BubbleBounceSpec, label = "iconScale")
     val animatedTx by animateFloatAsState(externalTranslationX, LiquidSprings.AdjacentShiftSpec, label = "iconTx")
     val animatedTy by animateFloatAsState(externalTranslationY, LiquidSprings.AdjacentShiftSpec, label = "iconTy")
+
+    val bgBrush = remember(palette.glassBase) {
+        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.14f), palette.glassBase.copy(alpha = 0.45f)))
+    }
+    val borderBrush = remember(palette.rimCyanTint) {
+        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.44f), palette.rimCyanTint.copy(alpha = 0.12f), Color.White.copy(alpha = 0.22f)))
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -125,21 +135,18 @@ fun LiquidAppIcon(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(squircleShape)
-                    .background(Brush.linearGradient(listOf(Color.White.copy(alpha = 0.14f), palette.glassBase.copy(alpha = 0.45f))))
-                    .drawWithContent {
-                        drawContent()
-                        if (settings.applyIconMask) {
-                            drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.16f), Color.Transparent), 0f, size.height * 0.32f))
-                        }
-                    }
-                    .border(0.9.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = 0.44f), palette.rimCyanTint.copy(alpha = 0.12f), Color.White.copy(alpha = 0.22f))), squircleShape)
+                    .background(bgBrush)
+                    .border(0.9.dp, borderBrush, squircleShape)
             ) {
                 if (customUri != null) {
                     AsyncImage(model = Uri.parse(customUri), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 } else {
-                    val bmp = loadedBitmap
-                    if (bmp != null) Image(bitmap = bmp.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(if (settings.applyIconMask) 2.5.dp else 0.dp))
-                    else Text(app.label.take(1).uppercase(), color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    val img = loadedImage
+                    if (img != null) {
+                        Image(bitmap = img, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(if (settings.applyIconMask) 2.5.dp else 0.dp))
+                    } else {
+                        Text(app.label.take(1).uppercase(), color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
 

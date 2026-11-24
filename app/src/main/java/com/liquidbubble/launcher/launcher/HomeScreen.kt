@@ -154,7 +154,7 @@ fun HomeScreen(
             HomeEditToolbar(onAddWidget = onOpenAddWidgetPicker, onWallpaper = onOpenWallpaperSettings, onSettings = onOpenSettings, onDone = onExitEditMode)
         }
 
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().weight(1f)) { page ->
+        HorizontalPager(state = pagerState, beyondViewportPageCount = 1, modifier = Modifier.fillMaxWidth().weight(1f)) { page ->
             when (page) {
                 0 -> MainHomePage(
                     columns = adaptiveColumns, appsByKey = appsByKey, badgeCounts = badgeCounts, weather = weather,

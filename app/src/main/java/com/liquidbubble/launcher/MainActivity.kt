@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        requestHighRefreshRate()
+        requestHighRefreshRateOnce()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestHighRefreshRate() {
+    private fun requestHighRefreshRateOnce() {
         runCatching {
             val currentDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display
             else @Suppress("DEPRECATION") windowManager.defaultDisplay
@@ -75,19 +75,16 @@ class MainActivity : ComponentActivity() {
                 .maxByOrNull { it.refreshRate }
 
             window.attributes = window.attributes.apply {
-                if (bestMode != null) {
+                if (bestMode != null && bestMode.modeId != active.modeId) {
                     preferredDisplayModeId = bestMode.modeId
-                    preferredRefreshRate = bestMode.refreshRate
-                } else {
-                    preferredRefreshRate = 120f
                 }
+                preferredRefreshRate = bestMode?.refreshRate ?: 120f
             }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        requestHighRefreshRate()
         viewModel.refreshDefaultLauncherStatus()
     }
 
