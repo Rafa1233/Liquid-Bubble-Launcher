@@ -24,11 +24,12 @@ class LauncherMediaController(private val context: Context) {
     fun createNotificationListenerSettingsIntent(): Intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
 
     fun refreshPlaybackState(): Pair<MediaPlaybackState, Bitmap?> {
-        if (!hasNotificationListenerAccess() || sessionManager == null) {
+        val mgr = sessionManager
+        if (!hasNotificationListenerAccess() || mgr == null) {
             activeController = null
             return MediaPlaybackState(hasNotificationListenerAccess = false) to null
         }
-        val controllers = runCatching { sessionManager.getActiveSessions(listenerComponent) }.getOrDefault(emptyList())
+        val controllers = runCatching { mgr.getActiveSessions(listenerComponent) }.getOrDefault(emptyList())
         val chosen = controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING } ?: controllers.firstOrNull()
         activeController = chosen
         if (chosen == null) return MediaPlaybackState(hasActiveSession = false, hasNotificationListenerAccess = true) to null
