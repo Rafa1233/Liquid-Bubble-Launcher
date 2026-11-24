@@ -83,15 +83,11 @@ fun OnboardingScreen(
             .navigationBarsPadding()
             .padding(20.dp)
     ) {
-        LiquidBubbleSurface(
-            shape = RoundedCornerShape(34.dp),
-            glassAlphaOverride = 0.68f,
-            modifier = Modifier.fillMaxSize().align(Alignment.Center)
-        ) {
+        LiquidBubbleSurface(shape = RoundedCornerShape(34.dp), glassAlphaOverride = 0.68f, modifier = Modifier.fillMaxSize().align(Alignment.Center)) {
             Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize().padding(22.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text("Step ${step + 1} of $totalSteps", color = palette.rimCyanTint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    TextButton(onClick = onFinish) { Text("Skip", color = palette.textSecondary) }
+                    Text("Langkah ${step + 1} dari $totalSteps", color = palette.rimCyanTint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    TextButton(onClick = onFinish) { Text("Lewati", color = palette.textSecondary) }
                 }
 
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -100,87 +96,63 @@ fun OnboardingScreen(
                             Box(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier.size(76.dp).clip(RoundedCornerShape(22.dp)).background(Brush.linearGradient(listOf(palette.accentPrimary, palette.accentSecondary)))
-                            ) {
-                                Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = IceWhite, modifier = Modifier.size(38.dp))
-                            }
-                            Text("Liquid Bubble Launcher", color = IceWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                            Text("An Android Home Screen crafted with Spatial Liquid Glass, Titanium Mesh Aura, interactive Dynamic Island, and full Android customization.", color = palette.textSecondary, fontSize = 14.sp, textAlign = TextAlign.Center)
+                            ) { Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = IceWhite, modifier = Modifier.size(38.dp)) }
+                            Text("Rii Launcher", color = IceWhite, fontSize = 26.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                            Text("Home Screen Android bergaya Liquid Glass iPhone 17 Pro Max, dukungan layar hingga 120Hz, Dynamic Island interaktif, serta widget Cuaca & Kalender.", color = palette.textSecondary, fontSize = 13.5.sp, textAlign = TextAlign.Center)
                         }
                         1 -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Text("Choose Your Glass Theme", color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                            LiquidBubbleSurface(shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().height(92.dp)) {
-                                Column(verticalArrangement = Arrangement.Center, modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                                    Text("6-Layer Refractive Glass", color = IceWhite, fontWeight = FontWeight.SemiBold)
-                                    Text("Specular rim, inner top gloss, depth shadow & blur", color = palette.textSecondary, fontSize = 12.sp)
-                                }
-                            }
-                            LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.height(170.dp)) {
+                            Text("Pilih Tema Liquid Glass", color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                            LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.height(220.dp)) {
                                 items(LauncherThemePreset.entries.filter { it != LauncherThemePreset.CUSTOM }) { preset ->
                                     val selected = settings.themePreset == preset
                                     Box(
                                         contentAlignment = Alignment.Center,
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(16.dp))
+                                        modifier = Modifier.clip(RoundedCornerShape(16.dp))
                                             .background(if (selected) palette.accentPrimary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.08f))
                                             .border(1.dp, if (selected) IceWhite else Color.White.copy(alpha = 0.16f), RoundedCornerShape(16.dp))
-                                            .clickable { onSelectThemePreset(preset) }
-                                            .padding(vertical = 12.dp, horizontal = 8.dp)
-                                    ) {
-                                        Text(preset.displayName, color = IceWhite, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                    }
+                                            .clickable { onSelectThemePreset(preset) }.padding(vertical = 12.dp, horizontal = 8.dp)
+                                    ) { Text(preset.displayName, color = IceWhite, fontSize = 12.sp, fontWeight = FontWeight.Medium) }
                                 }
                             }
                         }
                         2 -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Select Spatial Wallpaper", color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Pilih Wallpaper Spatial", color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                             Box(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.accentPrimary.copy(alpha = 0.35f)).clickable(onClick = onUseAuraWallpaper).padding(14.dp)
-                            ) {
-                                Text("Titanium Mesh Aura (Live Orbs)", color = IceWhite, fontWeight = FontWeight.SemiBold)
-                            }
+                            ) { Text("Titanium Mesh Aura (Cahaya Bergerak)", color = IceWhite, fontWeight = FontWeight.SemiBold) }
                             LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.height(190.dp)) {
                                 items(BuiltInWallpapers) { wp ->
                                     Box(
                                         contentAlignment = Alignment.Center,
                                         modifier = Modifier.height(54.dp).clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(listOf(wp.topColor, wp.midColor, wp.glowColor))).clickable { onSelectBuiltInWallpaper(wp.id) }
-                                    ) {
-                                        Text(wp.name, color = IceWhite, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                    }
+                                    ) { Text(wp.name, color = IceWhite, fontSize = 12.sp, fontWeight = FontWeight.Medium) }
                                 }
                             }
                         }
                         3 -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Icon(Icons.Rounded.Home, contentDescription = null, tint = palette.rimCyanTint, modifier = Modifier.size(48.dp))
-                            Text("Set as Default Launcher", color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-                            Text(
-                                text = if (isDefaultLauncher) "Liquid Bubble is currently active as your Default Home App." else "Make Liquid Bubble your Home screen so pressing the Home gesture or button always returns here.",
-                                color = palette.textSecondary, fontSize = 13.sp, textAlign = TextAlign.Center
-                            )
+                            Text("Jadikan Layar Utama Default", color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                            Text(if (isDefaultLauncher) "Rii Launcher sudah aktif sebagai Home App." else "Aktifkan Rii Launcher sebagai Home Screen utama Anda.", color = palette.textSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
                             Button(onClick = onSetDefaultLauncher, colors = ButtonDefaults.buttonColors(containerColor = palette.accentPrimary), modifier = Modifier.fillMaxWidth()) {
-                                Text(if (isDefaultLauncher) "Default Launcher Active" else "Set as Default Launcher")
+                                Text(if (isDefaultLauncher) "Sudah Aktif" else "Jadikan Default Launcher")
                             }
-                            OutlinedButton(onClick = { step++ }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Continue Without Setting Default", color = IceWhite)
-                            }
-                            TextButton(onClick = { showLearnMore = !showLearnMore }) { Text("Learn More", color = palette.rimCyanTint) }
-                            if (showLearnMore) {
-                                Text("You can switch back to your previous launcher anytime from Liquid Settings → System & Backup, or uninstall normally in Android Settings.", color = palette.textSecondary, fontSize = 11.5.sp, textAlign = TextAlign.Center)
-                            }
+                            OutlinedButton(onClick = { step++ }, modifier = Modifier.fillMaxWidth()) { Text("Lanjut Tanpa Default", color = IceWhite) }
+                            TextButton(onClick = { showLearnMore = !showLearnMore }) { Text("Pelajari", color = palette.rimCyanTint) }
+                            if (showLearnMore) Text("Bisa diganti kembali kapan saja dari Pengaturan Rii → Pilih Layar Utama Default.", color = palette.textSecondary, fontSize = 11.5.sp, textAlign = TextAlign.Center)
                         }
                         4 -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Icon(Icons.Rounded.Security, contentDescription = null, tint = palette.rimCyanTint, modifier = Modifier.size(44.dp))
-                            Text("Privacy-First Permissions", color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                            Text("We never ask for unnecessary permissions at startup. Optional permissions are requested only if you use a feature:", color = palette.textSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
+                            Text("Privasi & Izin Opsional", color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color.White.copy(alpha = 0.06f)).padding(14.dp)) {
-                                Text("• Camera: Only when toggling Flashlight", color = IceWhite, fontSize = 12.5.sp)
-                                Text("• Location: Optional for local Open-Meteo weather", color = IceWhite, fontSize = 12.5.sp)
-                                Text("• Notification Access: Optional for Now Playing & Badges", color = IceWhite, fontSize = 12.5.sp)
+                                Text("• Kamera: Hanya saat menekan Senter di Dynamic Island", color = IceWhite, fontSize = 12.5.sp)
+                                Text("• Lokasi: Opsional untuk cuaca Open-Meteo", color = IceWhite, fontSize = 12.5.sp)
+                                Text("• Akses Notifikasi: Opsional untuk Musik & Lencana", color = IceWhite, fontSize = 12.5.sp)
                             }
                         }
                         5 -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("Pick Favorite Home Apps", color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Selected: ${favoriteKeys.size} apps (tap to toggle)", color = palette.textSecondary, fontSize = 12.sp)
+                            Text("Pilih Aplikasi Favorit", color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Terpilih: ${favoriteKeys.size} aplikasi", color = palette.textSecondary, fontSize = 12.sp)
                             LazyVerticalGrid(columns = GridCells.Fixed(4), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.height(250.dp)) {
                                 items(installedApps.take(24), key = { it.componentKey }) { app ->
                                     val selected = app.componentKey in favoriteKeys
@@ -192,7 +164,7 @@ fun OnboardingScreen(
                         }
                         6 -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("Floating Bubble Dock", color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Your Phone, Messages, Browser, and Camera shortcuts were automatically mapped via system intents. Long-press any Dock icon anytime to replace or drag-reorder.", color = palette.textSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
+                            Text("Tekan tahan ikon Dock untuk mengganti atau menggeser urutannya.", color = palette.textSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
                             LiquidBubbleSurface(shape = RoundedCornerShape(30.dp), modifier = Modifier.fillMaxWidth().height(78.dp)) {
                                 Row(horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
                                     settings.dockAppKeys.take(4).forEach { key ->
@@ -204,21 +176,21 @@ fun OnboardingScreen(
                         }
                         7 -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = Color(0xFF4ADE80), modifier = Modifier.size(56.dp))
-                            Text("Ready for Liquid Glass", color = IceWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            Text("Swipe up for App Library, tap Dynamic Island for controls & music, or long-press the wallpaper anytime to customize.", color = palette.textSecondary, fontSize = 13.5.sp, textAlign = TextAlign.Center)
+                            Text("Rii Launcher Siap!", color = IceWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text("Usap ke atas untuk semua aplikasi, ketuk Dynamic Island untuk kontrol cepat, atau ketuk 🔍 Cari di atas Dock.", color = palette.textSecondary, fontSize = 13.5.sp, textAlign = TextAlign.Center)
                         }
                     }
                 }
 
                 Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    if (step > 0) TextButton(onClick = { step-- }) { Text("Back", color = palette.textSecondary) } else Spacer(modifier = Modifier.size(64.dp))
+                    if (step > 0) TextButton(onClick = { step-- }) { Text("Kembali", color = palette.textSecondary) } else Spacer(modifier = Modifier.size(64.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         repeat(totalSteps) { idx ->
                             Box(modifier = Modifier.size(if (idx == step) 10.dp else 6.dp).clip(CircleShape).background(if (idx == step) IceWhite else Color.White.copy(alpha = 0.28f)))
                         }
                     }
                     Button(onClick = { if (step < totalSteps - 1) step++ else onFinish() }, colors = ButtonDefaults.buttonColors(containerColor = palette.accentPrimary)) {
-                        Text(if (step < totalSteps - 1) "Next" else "Enter Home")
+                        Text(if (step < totalSteps - 1) "Lanjut" else "Mulai")
                     }
                 }
             }
