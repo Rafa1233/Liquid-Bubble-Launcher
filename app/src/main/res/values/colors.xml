@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="midnight_indigo">#FF070913</color>
+    <color name="deep_glass">#FF141824</color>
+    <color name="electric_cobalt">#FF2563EB</color>
+    <color name="cyber_violet">#FF7C3AED</color>
+    <color name="sunset_coral">#FFF43F5E</color>
+    <color name="ice_white">#FFF8FAFC</color>
+    <color name="glass_cyan">#FFA5B4FC</color>
+</resources>
