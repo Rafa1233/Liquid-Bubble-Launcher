@@ -2,6 +2,7 @@ package com.liquidbubble.launcher
 
 import android.content.Intent
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -29,6 +30,7 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        requestHighRefreshRate()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -46,9 +48,11 @@ class MainActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.events.collect { event ->
                     if (event is LauncherUiEvent.RequestWindowBrightness) {
-                        val attrs = window.attributes
-                        attrs.screenBrightness = event.brightness
-                        window.attributes = attrs
+                        runCatching {
+                            val attrs = window.attributes
+                            attrs.screenBrightness = event.brightness
+                            window.attributes = attrs
+                        }
                     }
                 }
             }
@@ -59,16 +63,37 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun requestHighRefreshRate() {
+        runCatching {
+            val currentDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display
+            else @Suppress("DEPRECATION") windowManager.defaultDisplay
+            if (currentDisplay == null) return
+
+            val active = currentDisplay.mode
+            val bestMode = currentDisplay.supportedModes
+                .filter { it.physicalWidth == active.physicalWidth && it.physicalHeight == active.physicalHeight }
+                .maxByOrNull { it.refreshRate }
+
+            window.attributes = window.attributes.apply {
+                if (bestMode != null) {
+                    preferredDisplayModeId = bestMode.modeId
+                    preferredRefreshRate = bestMode.refreshRate
+                } else {
+                    preferredRefreshRate = 120f
+                }
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        requestHighRefreshRate()
         viewModel.refreshDefaultLauncherStatus()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.hasCategory(Intent.CATEGORY_HOME)) {
-            viewModel.onHomeButtonPressed()
-        }
+        if (intent.hasCategory(Intent.CATEGORY_HOME)) viewModel.onHomeButtonPressed()
     }
 }

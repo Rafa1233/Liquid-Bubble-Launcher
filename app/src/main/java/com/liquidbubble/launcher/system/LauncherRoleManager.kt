@@ -8,65 +8,35 @@ import android.os.Build
 import android.provider.Settings
 
 class LauncherRoleManager(private val context: Context) {
-
-    fun isDefaultLauncher(): Boolean {
+    fun isDefaultLauncher(): Boolean = runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = context.getSystemService(RoleManager::class.java)
-            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_HOME)) {
-                return roleManager.isRoleHeld(RoleManager.ROLE_HOME)
-            }
+            val rm = context.getSystemService(RoleManager::class.java)
+            if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME)) return@runCatching rm.isRoleHeld(RoleManager.ROLE_HOME)
         }
-        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-            addCategory(Intent.CATEGORY_HOME)
-        }
-        val resolveInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.packageManager.resolveActivity(
-                homeIntent,
-                PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong())
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            context.packageManager.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
-        }
-        return resolveInfo?.activityInfo?.packageName == context.packageName
-    }
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val ri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) context.packageManager.resolveActivity(home, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+        else @Suppress("DEPRECATION") context.packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
+        ri?.activityInfo?.packageName == context.packageName
+    }.getOrDefault(false)
 
     fun createSetDefaultLauncherIntent(): Intent {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = context.getSystemService(RoleManager::class.java)
-            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_HOME)) {
-                return roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME)
-            }
+            val rm = context.getSystemService(RoleManager::class.java)
+            if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME)) return rm.createRequestRoleIntent(RoleManager.ROLE_HOME)
         }
         return createSystemHomeSettingsIntent()
     }
 
     fun createSystemHomeSettingsIntent(): Intent {
-        val homeSettings = Intent(Settings.ACTION_HOME_SETTINGS)
-        if (homeSettings.resolveActivity(context.packageManager) != null) {
-            return homeSettings
-        }
-        return Intent(Settings.ACTION_SETTINGS)
+        val i = Intent(Settings.ACTION_HOME_SETTINGS)
+        return if (i.resolveActivity(context.packageManager) != null) i else Intent(Settings.ACTION_SETTINGS)
     }
 
-    fun getCurrentDefaultLauncherLabel(): String {
-        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-            addCategory(Intent.CATEGORY_HOME)
-        }
-        val resolveInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.packageManager.resolveActivity(
-                homeIntent,
-                PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong())
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            context.packageManager.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
-        }
-        val pkg = resolveInfo?.activityInfo?.packageName ?: return "System Default"
-        return if (pkg == context.packageName) {
-            "Liquid Bubble Launcher"
-        } else {
-            resolveInfo.loadLabel(context.packageManager).toString()
-        }
-    }
+    fun getCurrentDefaultLauncherLabel(): String = runCatching {
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val ri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) context.packageManager.resolveActivity(home, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+        else @Suppress("DEPRECATION") context.packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
+        val pkg = ri?.activityInfo?.packageName ?: return@runCatching "System Default"
+        if (pkg == context.packageName) "Rii Launcher" else ri.loadLabel(context.packageManager).toString()
+    }.getOrDefault("System Default")
 }

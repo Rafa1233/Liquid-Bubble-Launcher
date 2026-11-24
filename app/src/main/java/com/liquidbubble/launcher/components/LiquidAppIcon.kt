@@ -35,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -90,14 +89,10 @@ fun LiquidAppIcon(
 
     val customUri = settings.customAppIconUris[app.componentKey]
     val iconPx = with(density) { finalIconSize.roundToPx().coerceIn(72, 240) }
-    var loadedBitmap by remember(app.componentKey, settings.activeIconPackPackage, iconPx) {
-        mutableStateOf<Bitmap?>(null)
-    }
+    var loadedBitmap by remember(app.componentKey, settings.activeIconPackPackage, iconPx) { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(app.componentKey, settings.activeIconPackPackage, customUri, iconPx) {
-        if (customUri == null) {
-            loadedBitmap = appManager.getAppIconBitmap(app, settings.activeIconPackPackage, iconPx)
-        }
+        if (customUri == null) loadedBitmap = appManager.getAppIconBitmap(app, settings.activeIconPackPackage, iconPx)
     }
 
     val interactionSource = remember { MutableInteractionSource() }
@@ -105,34 +100,23 @@ fun LiquidAppIcon(
 
     LaunchedEffect(isPressed) {
         onPressStateChanged?.invoke(isPressed)
-        if (isPressed && settings.hapticsEnabled) {
-            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-        }
+        if (isPressed && settings.hapticsEnabled) view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
     }
 
-    val targetScale = if (isPressed && !settings.reducedMotion) 1.13f else 1f
-    val animatedScale by animateFloatAsState(targetValue = targetScale * externalScale, animationSpec = LiquidSprings.BubbleBounceSpec, label = "iconScale")
-    val animatedTx by animateFloatAsState(targetValue = externalTranslationX, animationSpec = LiquidSprings.AdjacentShiftSpec, label = "iconTx")
-    val animatedTy by animateFloatAsState(targetValue = externalTranslationY, animationSpec = LiquidSprings.AdjacentShiftSpec, label = "iconTy")
+    val targetScale = if (isPressed && !settings.reducedMotion) 1.12f else 1f
+    val animatedScale by animateFloatAsState(targetScale * externalScale, LiquidSprings.BubbleBounceSpec, label = "iconScale")
+    val animatedTx by animateFloatAsState(externalTranslationX, LiquidSprings.AdjacentShiftSpec, label = "iconTx")
+    val animatedTy by animateFloatAsState(externalTranslationY, LiquidSprings.AdjacentShiftSpec, label = "iconTy")
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .semantics { contentDescription = app.label }
-            .graphicsLayer {
-                scaleX = animatedScale
-                scaleY = animatedScale
-                translationX = animatedTx
-                translationY = animatedTy
-            }
+            .graphicsLayer { scaleX = animatedScale; scaleY = animatedScale; translationX = animatedTx; translationY = animatedTy }
             .combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
+                interactionSource = interactionSource, indication = null,
                 onClick = { onClick(view) },
-                onLongClick = {
-                    if (settings.hapticsEnabled) view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                    onLongClick()
-                }
+                onLongClick = { if (settings.hapticsEnabled) view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); onLongClick() }
             )
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(finalIconSize)) {
@@ -140,37 +124,22 @@ fun LiquidAppIcon(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxSize()
-                    .shadow(8.dp, squircleShape, ambientColor = Color.Black.copy(alpha = 0.45f), spotColor = Color.Black.copy(alpha = 0.45f))
                     .clip(squircleShape)
-                    .background(Brush.linearGradient(listOf(Color.White.copy(alpha = 0.16f), palette.glassBase.copy(alpha = 0.55f))))
+                    .background(Brush.linearGradient(listOf(Color.White.copy(alpha = 0.14f), palette.glassBase.copy(alpha = 0.45f))))
                     .drawWithContent {
                         drawContent()
                         if (settings.applyIconMask) {
-                            drawRect(
-                                brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.Transparent), startY = 0f, endY = size.height * 0.34f)
-                            )
+                            drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.16f), Color.Transparent), 0f, size.height * 0.32f))
                         }
                     }
-                    .border(
-                        1.dp,
-                        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.42f), palette.rimCyanTint.copy(alpha = 0.14f), Color.White.copy(alpha = 0.22f))),
-                        squircleShape
-                    )
+                    .border(0.9.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = 0.44f), palette.rimCyanTint.copy(alpha = 0.12f), Color.White.copy(alpha = 0.22f))), squircleShape)
             ) {
                 if (customUri != null) {
                     AsyncImage(model = Uri.parse(customUri), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 } else {
                     val bmp = loadedBitmap
-                    if (bmp != null) {
-                        Image(
-                            bitmap = bmp.asImageBitmap(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize().padding(if (settings.applyIconMask) 3.dp else 0.dp)
-                        )
-                    } else {
-                        Text(app.label.take(1).uppercase(), color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                    if (bmp != null) Image(bitmap = bmp.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(if (settings.applyIconMask) 2.5.dp else 0.dp))
+                    else Text(app.label.take(1).uppercase(), color = IceWhite, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -180,23 +149,13 @@ fun LiquidAppIcon(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .offset(x = 4.dp, y = (-4).dp)
-                        .defaultMinSize(
-                            minWidth = if (settings.showBadgeCount) 18.dp else 12.dp,
-                            minHeight = if (settings.showBadgeCount) 18.dp else 12.dp
-                        )
+                        .defaultMinSize(minWidth = if (settings.showBadgeCount) 18.dp else 12.dp, minHeight = if (settings.showBadgeCount) 18.dp else 12.dp)
                         .clip(CircleShape)
                         .background(SunsetCoral)
-                        .border(1.dp, Color.White.copy(alpha = 0.75f), CircleShape)
+                        .border(1.dp, Color.White.copy(alpha = 0.78f), CircleShape)
                         .padding(horizontal = if (settings.showBadgeCount) 5.dp else 0.dp)
                 ) {
-                    if (settings.showBadgeCount) {
-                        Text(
-                            text = if (badgeCount > 99) "99+" else badgeCount.toString(),
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    if (settings.showBadgeCount) Text(if (badgeCount > 99) "99+" else badgeCount.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -205,15 +164,8 @@ fun LiquidAppIcon(
             Spacer(modifier = Modifier.height(5.dp))
             Text(
                 text = app.label,
-                style = TextStyle(
-                    color = IceWhite,
-                    fontSize = settings.labelFontSizeSp.sp,
-                    fontWeight = FontWeight.Medium,
-                    shadow = Shadow(Color.Black.copy(alpha = 0.65f), Offset(0f, 1.5f), 4f)
-                ),
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+                style = TextStyle(color = IceWhite, fontSize = settings.labelFontSizeSp.sp, fontWeight = FontWeight.Medium, shadow = Shadow(Color.Black.copy(alpha = 0.65f), Offset(0f, 1.5f), 4f)),
+                textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = finalIconSize + 14.dp)
             )
         }

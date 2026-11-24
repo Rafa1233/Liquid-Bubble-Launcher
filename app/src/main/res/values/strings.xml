@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Liquid Bubble</string>
-    <string name="settings_title">Liquid Settings</string>
-    <string name="notification_listener_label">Liquid Bubble Media &amp; Badges</string>
-    <string name="default_launcher_prompt_title">Set Liquid Bubble as Default Home</string>
-    <string name="default_launcher_prompt_desc">Experience Liquid Glass UI every time you press Home. You can switch back to your previous launcher anytime from Liquid Settings.</string>
-    <string name="camera_permission_rationale">Camera permission is required solely to toggle the device flashlight hardware from Dynamic Island.</string>
-    <string name="location_permission_rationale">Approximate location is optional and used only to fetch local weather from Open-Meteo. You can enter a city manually instead.</string>
+    <string name="app_name">Rii Launcher</string>
+    <string name="settings_title">Pengaturan Rii</string>
+    <string name="notification_listener_label">Rii Launcher Media &amp; Lencana</string>
+    <string name="default_launcher_prompt_title">Jadikan Rii Launcher Layar Utama</string>
+    <string name="default_launcher_prompt_desc">Nikmati tampilan Liquid Glass ala iPhone 17 Pro Max setiap menekan Home.</string>
+    <string name="camera_permission_rationale">Izin kamera hanya dipakai untuk menyalakan senter dari Dynamic Island.</string>
+    <string name="location_permission_rationale">Lokasi bersifat opsional untuk cuaca lokal Open-Meteo.</string>
 </resources>
