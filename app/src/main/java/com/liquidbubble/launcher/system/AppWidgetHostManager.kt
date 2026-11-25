@@ -9,20 +9,26 @@ import android.content.Intent
 
 class AppWidgetHostManager(private val context: Context) {
 
-    val appWidgetManager: AppWidgetManager = AppWidgetManager.getInstance(context)
-    val appWidgetHost: AppWidgetHost = AppWidgetHost(context, HOST_ID)
+    private val appCtx = context.applicationContext
+    val appWidgetManager: AppWidgetManager? by lazy {
+        runCatching { AppWidgetManager.getInstance(appCtx) }.getOrNull()
+    }
+    val appWidgetHost: AppWidgetHost? by lazy {
+        runCatching { AppWidgetHost(appCtx, HOST_ID) }.getOrNull()
+    }
 
-    fun startListening() { runCatching { appWidgetHost.startListening() } }
-    fun stopListening() { runCatching { appWidgetHost.stopListening() } }
+    fun startListening() { runCatching { appWidgetHost?.startListening() } }
+    fun stopListening() { runCatching { appWidgetHost?.stopListening() } }
 
     fun getInstalledProviders(): List<AppWidgetProviderInfo> = runCatching {
-        appWidgetManager.installedProviders.sortedBy { it.loadLabel(context.packageManager).lowercase() }
+        appWidgetManager?.installedProviders?.sortedBy { it.loadLabel(context.packageManager).lowercase() } ?: emptyList()
     }.getOrDefault(emptyList())
 
-    fun allocateWidgetId(): Int = appWidgetHost.allocateAppWidgetId()
+    fun allocateWidgetId(): Int = runCatching { appWidgetHost?.allocateAppWidgetId() ?: -1 }.getOrDefault(-1)
 
     fun tryBindWidget(appWidgetId: Int, provider: AppWidgetProviderInfo): Boolean = runCatching {
-        appWidgetManager.bindAppWidgetIdIfAllowed(appWidgetId, provider.provider)
+        if (appWidgetId == -1) return@runCatching false
+        appWidgetManager?.bindAppWidgetIdIfAllowed(appWidgetId, provider.provider) == true
     }.getOrDefault(false)
 
     fun createBindRequestIntent(appWidgetId: Int, provider: AppWidgetProviderInfo): Intent =
@@ -32,13 +38,14 @@ class AppWidgetHostManager(private val context: Context) {
         }
 
     fun getProviderInfo(appWidgetId: Int): AppWidgetProviderInfo? =
-        appWidgetManager.getAppWidgetInfo(appWidgetId)
+        runCatching { appWidgetManager?.getAppWidgetInfo(appWidgetId) }.getOrNull()
 
     fun createHostView(appWidgetId: Int, info: AppWidgetProviderInfo): AppWidgetHostView =
-        appWidgetHost.createView(context, appWidgetId, info).apply { setAppWidget(appWidgetId, info) }
+        runCatching { appWidgetHost?.createView(appCtx, appWidgetId, info)?.apply { setAppWidget(appWidgetId, info) } }
+            .getOrNull() ?: AppWidgetHostView(context)
 
     fun deleteWidgetId(appWidgetId: Int) {
-        runCatching { appWidgetHost.deleteAppWidgetId(appWidgetId) }
+        if (appWidgetId != -1) runCatching { appWidgetHost?.deleteAppWidgetId(appWidgetId) }
     }
 
     companion object {
